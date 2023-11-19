@@ -14,7 +14,7 @@ export type BoardEvent<T> = {
     kind: "Match";
     match: Match<T>;
   } | {
-    kind: "Refill"
+    kind: "Refill";
   };
 
 export type BoardListener<T> = (event: BoardEvent<T>) => void;
@@ -33,6 +33,10 @@ export class Board<T> {
         this.generator = generator;
         
         this.board = this.generate(generator);
+
+        while (this.findMatch()) {
+            this.executeMatch();
+        }
     }
 
     addListener(listener: BoardListener<T>) {
@@ -204,6 +208,7 @@ export class Board<T> {
     }
 
     notify(event: BoardEvent<T>): void {
+        console.log(event);
         this.listeners.forEach(listener => listener(event));
     }
     

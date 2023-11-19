@@ -207,7 +207,7 @@ describe("Board", () => {
                 board.move({row: 2, col: 3}, {row: 3, col: 3})
                 expect(events).toContainEqual({kind: 'Match', match: {matched: 'C', positions: [{row: 0, col: 3}, {row: 1, col: 3}, {row: 2, col: 3}]}})
             })
-            it.only("fires multiple events on horz + vert matches", () => {
+            it("fires multiple events on horz + vert matches", () => {
                 generator.prepare('G', 'H', 'I')
                 generator.prepare('J', 'K', 'L')
                 generator.prepare('J', 'K', 'L')
