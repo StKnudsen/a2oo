@@ -10,266 +10,211 @@ export type Match<T> = {
     positions: Position[]
 }
 
-export type BoardEvent<T> = {
-    kind: "Match";
-    match: Match<T>;
-  } | {
-    kind: "Refill";
-  };
+export type BoardEvent<T> = {};
 
 export type BoardListener<T> = (event: BoardEvent<T>) => void;
 
 export class Board<T> {
-    readonly generator: Generator<T>
-    readonly height: number
     readonly width: number
-    listeners: BoardListener<T>[] = [];
-    matches: Match<T>[] = [];
-    board: T[][] = [];
+    readonly height: number
+    generator: Generator<T>
+    listeners: BoardListener<T>[] = []
+    matches: Match<T>[] = []
+    board: T[][] = []
 
+    // Constructor here
     constructor(generator: Generator<T>, width: number, height: number) {
         this.width = width;
         this.height = height;
         this.generator = generator;
-        
-        this.board = this.generate(generator);
 
-        while (this.findMatch()) {
-            this.executeMatch();
-        }
-    }
+        this.generateBoard();
+
+        while (this.findMatches()) {}
+    }   
 
     addListener(listener: BoardListener<T>) {
         this.listeners.push(listener);
     }
 
     positions(): Position[] {
-        let array = [];
+        let positions: Position[] = [];
 
-        for (let i = 0; i < this.height; i++) {
-            for (let j = 0; j < this.width; j++) {
-                array.push({row: i, col: j});
+        for(let row = 0; row < this.height; row++) {
+            for(let col = 0; col < this.width; col++) {
+                positions.push({row, col})
             }
         }
 
-        return array;
+        return positions;
     }
 
     piece(p: Position): T | undefined {
-        if (p.row < 0 || p.col < 0) {
-            return undefined;
-        }
+        if (p.row < 0 || p.col < 0) return undefined;
 
-        if (p.row < this.height && p.col < this.width) {
+        if (p.row < this.height && p.col < this.width) 
             return this.board[p.row][p.col];
-        }
 
         return undefined;
     }
 
     canMove(first: Position, second: Position): boolean {
-        if (this.piece(first) === undefined 
-            || this.piece(second) === undefined
-            || this.piece(first) === this.piece(second)) {
+        if (this.piece(first) === undefined || this.piece(second) === undefined)
             return false;
-        }
 
         if (first.row === second.row || first.col === second.col) {
-            
+            this.swap(first, second);
+            const legalMove = this.hasMatch(first, second);
             this.swap(first, second);
 
-            let canSwap: boolean = this.hasMatch(first, second);
-
-            this.swap(first, second);
-
-            return canSwap;
+            return legalMove;
         }
 
         return false;
     }
+
     
     move(first: Position, second: Position) {
         if (this.canMove(first, second)) {
             this.swap(first, second);
 
-            while (this.findMatch()) {
-                this.executeMatch();
-            }
+            while (this.findMatches()) {}
+            // this.findMatches();
         }
     }
 
-    executeMatch(): void {
+    private refill(): void {
+        let didRefill = false;
+        // clear matches
         this.matches.forEach(match => {
-            const p1 = match.positions[0];
-            const p2 = match.positions[1];
-            const p3 = match.positions[2];
-
-            this.board[p1.row][p1.col] = undefined;
-            this.board[p2.row][p2.col] = undefined;
-            this.board[p3.row][p3.col] = undefined;
+            match.positions.forEach(position => {
+                this.board[position.row][position.col] = undefined;
+            });
         });
 
         this.matches = [];
-        this.notify({kind: "Refill"});
-        this.refill();
-    }
 
-    refill(): void {
+        // move tiles down
         for (let col = 0; col < this.width; col++) {
             for (let row = this.height - 1; row >= 0; row--) {
                 if (this.board[row][col] === undefined) {
-                    let index = row - 1;
+                    let newRow = row - 1;
 
-                    while (index >= 0 && this.board[index][col] === undefined) {
-                        index--;
+                    while (newRow >= 0 && this.board[newRow][col] === undefined) {
+                        newRow--;
                     }
 
-                    if (index >= 0) {
-                        this.board[row][col] = this.board[index][col];
-                        this.board[index][col] = undefined;
+                    if (newRow >= 0) {
+                        this.board[row][col] = this.board[newRow][col];
+                        this.board[newRow][col] = undefined;
                     }
                 }
             }
         }
 
+        // refill board
         for (let col = 0; col < this.width; col++) {
             for (let row = 0; row < this.height; row++) {
                 if (this.board[row][col] === undefined) {
                     this.board[row][col] = this.generator.next();
+                    didRefill = true;
                 }
             }
         }
+
+        if (didRefill)
+            this.fireEvent({kind: 'Refill'});
+
+        console.log(this.board);
+
     }
 
-    findMatch(): boolean {
-        let foundMatch: boolean = false;
+    private findMatches(): boolean {
+        let foundMatch = false;
 
         for (let row = 0; row < this.height; row++) {
-            for (let col = 0; col < this.width - 2; col++) {
-                if (!foundMatch) {
-                    foundMatch = this.findHorizontalMatch(row, col);
+            for (let col = 0; col < this.width; col++) {
+                let piece = this.piece({row, col});
+                
+                // check for row matches
+                if (this.piece({row, col: col + 1}) === piece && this.piece({row, col: col + 2}) === piece) {
+                    const match = {matched: piece, positions: [{row, col}, {row, col: col + 1}, {row, col: col + 2}]};
+                    this.matches.push(match);
+
+                    this.fireEvent({kind: 'Match', match}); 
+                    foundMatch = true;
+                }
+
+                // check for col matches
+                if (this.piece({row: row + 1, col}) === piece && this.piece({row: row + 2, col}) === piece) {
+                    const match = {matched: piece, positions: [{row, col}, {row: row + 1, col}, {row: row + 2, col}]};
+                    this.matches.push(match);
+
+                    this.fireEvent({kind: 'Match', match}); 
+                    foundMatch = true;
                 }
             }
         }
 
-        for (let col = 0; col < this.width; col++) {
-            for (let row = 0; row < this.height - 2; row++) {
-                if (!foundMatch) {
-                    foundMatch = this.findVerticalMatch(row, col);
-                }
-            }
-        }
+        this.refill();
 
         return foundMatch;
     }
 
-    findVerticalMatch(row: number, col: number): boolean {
-        const p1 = {row: row, col: col};
-        const p2 = {row: row + 1, col: col};
-        const p3 = {row: row + 2, col: col};
-
-        const piece1 = this.piece(p1);
-        const piece2 = this.piece(p2);
-        const piece3 = this.piece(p3);
-
-        if (piece1 === piece2 && piece2 === piece3) {
-            const positions = [p1, p2, p3];
-            const match = {matched: piece1, positions: positions};
-
-            this.notify({kind: "Match", match: match});
-            this.matches.push(match);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    findHorizontalMatch(row: number, col: number): boolean {
-        const p1 = {row: row, col: col};
-        const p2 = {row: row, col: col + 1};
-        const p3 = {row: row, col: col + 2};
-
-        const piece1 = this.piece(p1);
-        const piece2 = this.piece(p2);
-        const piece3 = this.piece(p3);
-
-        if (piece1 === piece2 && piece2 === piece3) {
-            const positions = [p1, p2, p3];
-            const match = {matched: piece1, positions: positions};
-
-            this.notify({kind: "Match", match: match});
-            this.matches.push(match);
-
-            return true;
-        }
-
-        return false;
-    }
-
-    notify(event: BoardEvent<T>): void {
-        console.log(event);
+    private fireEvent(event: BoardEvent<T>): void {
         this.listeners.forEach(listener => listener(event));
     }
-    
-    swap(first: Position, second: Position) {
-        const tempFirst = this.piece(first);
-        const tempSecond = this.piece(second);
 
-        this.board[first.row][first.col] = tempSecond;
-        this.board[second.row][second.col] = tempFirst;
+    private hasMatch(first: Position, second: Position): boolean {
+        return this.checkRowMatch(first) || this.checkRowMatch(second) 
+        || this.checkColMatch(first) || this.checkColMatch(second);
     }
 
-    generate(generator) {
-        let array = [];
+    private checkRowMatch(p: Position): boolean {
+        const piece = this.piece(p);
 
-        for (let i = 0; i < this.height; i++) {
-            let row = [];
-            for (let j = 0; j < this.width; j++) {
-                row.push(generator.next());
-            }
-            array.push(row);
-        }
+        for (let col = p.col - 2; col <= p.col + 2; col++) {
+            if (col < 0 || col >= this.width) continue;
 
-        return array;
-    }
-
-    hasMatch(first: Position, second: Position): boolean {
-        return this.checkHorizontalMatch(first) 
-        || this.checkHorizontalMatch(second)
-        || this.checkForVerticalMatch(first)
-        || this.checkForVerticalMatch(second);
-    }
-
-    checkHorizontalMatch(p: Position) {
-        let piece = this.piece(p);
-
-        for (let i = p.col - 2; i <= p.col + 2; i++) {
-            if (i >= 0 && i + 2 < this.height) {
-                if (this.board[p.row][i] === piece
-                    && this.board[p.row][i + 1] === piece
-                    && this.board[p.row][i + 2] === piece) {
-                        return true;
-                    }
-            }
-       }
-
-       return false;
-    }
-
-    checkForVerticalMatch(p: Position) {
-        let piece = this.piece(p);
-
-        for (let i = p.row - 2; i <= p.row + 2; i++) {
-            if (i >= 0 && i + 2 < this.width) {
-                if (this.board[i][p.col] === piece
-                    && this.board[i + 1][p.col] === piece
-                    && this.board[i + 2][p.col] === piece) {
-                        return true;
-                    }
-            }
+            if (this.piece({row: p.row, col}) === piece && 
+                this.piece({row: p.row, col: col + 1}) === piece &&
+                this.piece({row: p.row, col: col + 2}) === piece) 
+                return true;
         }
 
         return false;
+    }
+
+    private checkColMatch(p: Position): boolean {
+        const piece = this.piece(p);
+
+        for (let row = p.row - 2; row <= p.row + 2; row++) {
+            if (row < 0 || row >= this.height) continue;
+
+            if (this.piece({row: row, col: p.col}) === piece && 
+                this.piece({row: row + 1, col: p.col}) === piece &&
+                this.piece({row: row + 2, col: p.col}) === piece) 
+                return true;
+        }
+
+        return false;
+    }
+
+    private swap(first: Position, second: Position) {
+        let temp = this.board[first.row][first.col];
+
+        this.board[first.row][first.col] = this.board[second.row][second.col];
+        this.board[second.row][second.col] = temp;
+    }
+
+    private generateBoard() {
+        for(let i = 0; i < this.height; i++) {
+            let row: T[] = []
+            
+            for(let j = 0; j < this.width; j++)
+                row.push(this.generator.next())
+            
+            this.board.push(row)
+        }
     }
 }

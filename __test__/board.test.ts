@@ -114,8 +114,6 @@ describe("Board", () => {
             )
             const board = new Board(generator, 4, 4)
             describe("valid vertical moves", () => {
-                console.log("Test board (valid vertical moves) :")
-                console.log(board)
                 it("recognizes vertical moves that moves first piece to a horizontal match as valid", () => {
                     expect(board.canMove({row: 2, col: 1}, {row: 0, col: 1})).toEqual(true)
                 })
@@ -131,8 +129,6 @@ describe("Board", () => {
             })
 
             describe("valid horizontal moves", () => {
-                console.log("Test board (valid horizontal moves) :")
-                console.log(board)
                 it("recognizes horizontal moves that moves first piece to a horizontal match as valid", () => {
                     expect(board.canMove({row: 3, col: 3}, {row: 3, col: 2})).toEqual(true)
                 })
@@ -284,14 +280,17 @@ describe("Board", () => {
                 ).withPieces('B', 'C', 'D')
             })
             it("shifts tiles down before replacing multiple matches", () => {
-                generator.prepare('D', 'B', 'C', 'A', 'B', 'A')
+                // generator.prepare('D', 'B', 'C', 'A', 'B', 'A')
+                generator.prepare('1', '2', '3', '4', '5', '6')
+
                 board.move({row: 3, col: 0}, {row: 3, col: 2})
                 require(board).toMatch(
                     '*', 'B', '*',
                     '*', 'B', '*',
                     '*', 'A', '*',
                     'A', 'D', 'A',
-                ).withPieces('A', 'A', 'B', 'B', 'C', 'D')
+                // ).withPieces('A', 'A', 'B', 'B', 'C', 'D')
+                ).withPieces('1', '2', '3', '4', '5', '6')
             })
             it("only deletes a double match once", () => {
                 generator = new GeneratorFake<String>(
@@ -301,14 +300,16 @@ describe("Board", () => {
                     'C', 'B', 'D',
                 )
                 board = new Board(generator, 3, 4)
-                generator.prepare('D', 'C', 'B', 'B', 'A')
+                // generator.prepare('D', 'C', 'B', 'B', 'A')
+                generator.prepare('1', '2', '3', '4', '5')
                 board.move({row: 0, col: 1}, {row: 2, col: 1})
                 require(board).toMatch(
                     '*', '*', '*',
                     'D', '*', 'A',
                     'D', '*', 'C',
                     'C', 'A', 'D',
-                ).withPieces('A', 'B', 'B', 'C', 'D')
+                // ).withPieces('A', 'B', 'B', 'C', 'D')
+                ).withPieces('1', '2', '3', '4', '5')
             })
         })
 
