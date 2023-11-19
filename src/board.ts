@@ -10,7 +10,12 @@ export type Match<T> = {
     positions: Position[]
 }
 
-export type BoardEvent<T> = {};
+export type BoardEvent<T> = {
+    kind: 'Match',
+    match: Match<T>
+} | {
+    kind: 'Refill'  
+};
 
 export type BoardListener<T> = (event: BoardEvent<T>) => void;
 
